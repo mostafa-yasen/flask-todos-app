@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Index</title>
+  <style>
+    body {
+      min-height: 100vh;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .hidden {
+      display: none;
+    }
+
+    .content-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 50vh;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      width: 250px;
+    }
+
+    ul li {
+      clear: both;
+    }
+
+    ul li button {
+      -webkit-appearance: none;
+      border: none;
+      outline: none;
+      color: red;
+      font-size: 20px;
+      background-color: transparent;
+      float: right;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="content-wrapper">
+    <div class="lists-wrapper">
+      Create List
+    <form id="frmCreateList">
+      <input type="text" id="txtNewListName" />
+      <input type="submit" value="Create List">
+    </form>
+    <ul class="lists-wrapper">
+      {% for l in lists %}
+      <li>
+        <input type="checkbox" class="list-completed" data-listId="{{ l.id }}" />
+        <a href="/lists/{{l.id}}">
+          {{ l.name }}
+        </a>
+      </li>
+      {% endfor %}
+    </ul>
+    </div>
+    <div class="todos-wrapper">
+      <h1> {{ active_list.name }} </h1>
+      <form id="createElementForm">
+        <input type="text" name="description" id="newItemInput" />
+        <input type="submit" value="Create">
+      </form>
+      <p id="error" class="hidden">Something went wrong!</p>
+      <ul id="todoList">
+        {% for i in data %}
+        <li>
+          <input class="check-completed" id="item_{{i.id}}" type="checkbox" data-id="{{ i.id }}" {% if i.completed %}
+            checked {% endif %} />
+          <label for="item_{{ i.id }}">{{ i.description }}</label>
+          <button class="delete-item" data-id="{{ i.id }}">&cross;</button>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const URL = window.location.pathname.split("/");
+    var currentListId = URL[URL.length - 1];
+
+    document.getElementById("createElementForm").onsubmit = function (e) {
+      e.preventDefault();
+      fetch("/todos/create", {
+          method: "POST",
+          body: JSON.stringify({
+            "description": document.getElementById("newItemInput").value,
+            "list_id": currentListId
+          }),
+          headers: {
+            "content-type": "application/json"
+          }
+        })
+        .then(function (r) {
+          return r.json()
+        })
+        .then(function (r) {
+          const newItem = document.createElement("LI");
+          const checkbox = document.createElement("INPUT");
+          const label = document.createElement("LABEL");
+
+          // Checkbox
+          checkbox.type = "checkbox"
+          checkbox.id = `item_${r.id}`
+          checkbox.classList.add("check-completed")
+          checkbox.datasetid = r.id
+
+          // Label
+          label.innerText = r.description;
+          label.htmlFor = `item_${r.id}`;
+
+          // Item
+          newItem.appendChild(checkbox);
+          newItem.appendChild(label);
+
+          document.getElementById("todoList").appendChild(newItem);
+          document.getElementById("error").classList.add("hidden");
+        })
+        .catch(function (e) {
+          console.log(e);
+          document.getElementById("error").classList.remove("hidden");
+        })
+    }
+
+    const checkboxes = document.querySelectorAll('.check-completed');
+    checkboxes.forEach(el => {
+      el.onchange = function (e) {
+        var itemId = e.target.dataset["id"],
+          completed = e.target.checked;
+
+        fetch(`/todos/${itemId}/set-completed`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              "completed": completed
+            })
+          })
+          .then(function (r) {
+            document.getElementById("error").classList.add("hidden");
+          })
+          .catch(function (e) {
+            document.getElementById("error").classList.remove("hidden");
+          })
+      }
+    })
+
+    document.querySelectorAll(".delete-item").forEach(el => {
+      el.onclick = function (e) {
+        var itemId = e.target.dataset["id"]
+        fetch(`/todos/${itemId}/delete`, {
+            method: "DELETE"
+          }).then(() => {
+            document.getElementById("error").classList.add("hidden");
+          })
+          .catch(e => {
+            console.log(e);
+            document.getElementById("error").classList.remove("hidden");
+          })
+      }
+    })
+
+    document.getElementById("frmCreateList").onsubmit = function (e) {
+      e.preventDefault();
+
+      var newListName = document.getElementById("txtNewListName").value;
+      fetch("/lists/new", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          name: newListName
+        })        
+      })
+      .then(r => {
+        document.getElementById("error").classList.add("hidden");
+        location.reload()
+      })
+      .catch(e => {
+        document.getElementById("error").classList.remove("hidden");
+        console.log(e)
+      })
+    }
+
+    document.querySelectorAll(".list-completed").forEach(el => {
+      el.onchange = function (e) {
+        var listId = e.target.dataset["listid"],
+        completed = e.target.checked;
+        
+        fetch(`lists/${listId}/set-completed`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            list_id: listId,
+            completed: completed
+          })
+        })
+        .then(r => { console.log(r) })
+        .catch (e => { console.log(e) })
+      }
+    })
+
+  </script>
+</body>
+
+</html>
